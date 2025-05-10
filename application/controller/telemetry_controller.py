@@ -4,27 +4,30 @@ import threading
 import math
 
 from pymavlink import mavutil
-
 from application.services.master_provider import MasterProvider
-from core.events.telemetry_events import TelemetryDataEvent
+from application.services.flight_state_manager import FlightStateManager
+
 from utils.event_bus import EventBus
 from core.events.telemetry_events import (
-    TelemetryDataEvent,
-    YawPitchRollUpdatedEvent, GPSUpdatedEvent,
-    SpeedUpdatedEvent, HDOPUpdatedEvent, ModeUpdatedEvent
+    YawPitchRollUpdatedEvent,
+    GPSUpdatedEvent,
+    SpeedUpdatedEvent,
+    HDOPUpdatedEvent,
+    ModeUpdatedEvent
 )
-
+from core.events.command_events import CommandAckReceivedEvent
 
 class TelemetryController:
     """
     Telemetri verilerini pymavlink üzerinden okuyup EventBus ile yayınlar.
+    Aynı zamanda FlightStateManager ile son durumu günceller.
     """
+
     def __init__(self):
         self._running = False
         self._thread = None
         self.master = None
 
-        # Son değerler
         self._yaw = 0.0
         self._pitch = 0.0
         self._roll = 0.0
@@ -35,10 +38,9 @@ class TelemetryController:
         self._speed = 0.0
         self._hdop = 0.0
 
+        self._state = FlightStateManager.get_instance()
+
     def start(self):
-        """
-        Telemetri okuma döngüsünü başlatır.
-        """
         self.stop()
 
         try:
@@ -47,7 +49,6 @@ class TelemetryController:
             print(f"[ERROR] TelemetryController başlatılamadı (master alınamadı): {e}")
             return
 
-        # ⬇️ MAVLink stream isteklerini gönder
         try:
             stream_requests = [
                 ("MAV_DATA_STREAM_RAW_SENSORS", 10),
@@ -76,9 +77,6 @@ class TelemetryController:
         print("[INFO] TelemetryController başlatıldı.")
 
     def stop(self):
-        """
-        Telemetri okuma döngüsünü durdurur.
-        """
         if self._running:
             self._running = False
             if self._thread and self._thread.is_alive():
@@ -113,6 +111,8 @@ class TelemetryController:
             self._alt = msg.alt / 1000.0
             EventBus.publish(GPSUpdatedEvent(self._lat, self._lon, self._alt))
 
+            self._state.update_altitude(self._alt)
+
         elif t == "GPS_RAW_INT":
             self._hdop = msg.eph / 100.0
             EventBus.publish(HDOPUpdatedEvent(self._hdop))
@@ -133,15 +133,14 @@ class TelemetryController:
 
             EventBus.publish(ModeUpdatedEvent(self._mode))
 
-        # İsteğe bağlı: Geri uyumluluk için hâlâ tüm veriyi birleştirip yaymak istersen:
-        # EventBus.publish(TelemetryDataEvent(
-        #     yaw=self._yaw,
-        #     pitch=self._pitch,
-        #     roll=self._roll,
-        #     latitude=self._lat,
-        #     longitude=self._lon,
-        #     altitude=self._alt,
-        #     speed=self._speed,
-        #     mode=self._mode,
-        #     hdop=self._hdop
-        # ))
+            self._state.update_mode(self._mode)
+            self._state.update_armed(msg.base_mode)
+
+        elif t == "COMMAND_ACK":
+            try:
+                EventBus.publish(CommandAckReceivedEvent(
+                    command_id=msg.command,
+                    result=msg.result
+                ))
+            except Exception as e:
+                print(f"[WARN] COMMAND_ACK event yayını başarısız: {e}")

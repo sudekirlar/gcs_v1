@@ -27,7 +27,6 @@ def main():
     ui.exit_pushButton.clicked.connect(main_window.close)
     ui.minimize_pushButton.clicked.connect(main_window.showMinimized)
 
-
     # Pencereyi göster
     main_window.show()
 

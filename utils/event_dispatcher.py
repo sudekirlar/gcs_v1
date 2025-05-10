@@ -14,6 +14,7 @@ from core.events.telemetry_events import (
     HDOPUpdatedEvent,
     ModeUpdatedEvent,
 )
+from core.events.command_events import CommandAckReceivedEvent
 
 
 class EventDispatcher(QObject):
@@ -36,6 +37,8 @@ class EventDispatcher(QObject):
     speedUpdated = pyqtSignal(SpeedUpdatedEvent)
     hdopUpdated = pyqtSignal(HDOPUpdatedEvent)
     modeUpdated = pyqtSignal(ModeUpdatedEvent)
+
+    commandAckReceived = pyqtSignal(CommandAckReceivedEvent)
 
     def __init__(self):
         super().__init__()
@@ -63,5 +66,7 @@ class EventDispatcher(QObject):
             self.hdopUpdated.emit(event)
         elif isinstance(event, ModeUpdatedEvent):
             self.modeUpdated.emit(event)
+        elif isinstance(event, CommandAckReceivedEvent):
+            self.commandAckReceived.emit(event)
         else:
             print(f"[WARN] EventDispatcher: Bilinmeyen event tipi {type(event)}")
