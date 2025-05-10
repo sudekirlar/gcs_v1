@@ -2,6 +2,9 @@
 
 import threading
 import math
+
+from pymavlink import mavutil
+
 from application.services.master_provider import MasterProvider
 from core.events.telemetry_events import TelemetryDataEvent
 from utils.event_bus import EventBus
@@ -54,7 +57,7 @@ class TelemetryController:
                 ("MAV_DATA_STREAM_EXTRA2", 5),
             ]
             for stream_name, rate in stream_requests:
-                stream_id = getattr(self.master.mavutil.mavlink, stream_name, None)
+                stream_id = getattr(mavutil.mavlink, stream_name, None)
                 if stream_id is not None:
                     self.master.mav.request_data_stream_send(
                         self.master.target_system,
