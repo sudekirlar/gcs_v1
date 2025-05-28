@@ -22,6 +22,7 @@ from core.events.telemetry_events import (
 )
 from core.events.command_events import CommandAckReceivedEvent
 from core.command.land_command import LandCommand
+from ui.map_display_adapter import MapDisplayAdapter
 
 class MainWindowController(QObject):
     gui_notify = pyqtSignal(str)  # ✅ Thread-safe GUI güncellemesi için sinyal
@@ -75,6 +76,16 @@ class MainWindowController(QObject):
         self.ui.changeMode_pushButton.clicked.connect(self.handle_set_mode_command)
         self.ui.takeOff_pushButton.clicked.connect(self.handle_takeoff_command)
         self.ui.land_pushButton.clicked.connect(self.handle_land_command)
+
+        # Harita widget’ı oluştur
+        self.map_widget = MapDisplayAdapter(parent=self.ui.centralwidget)
+
+        # mapShown_label ile aynı konuma yerleştir
+        geom = self.ui.mapShown_label.geometry()
+        self.map_widget.setGeometry(geom)
+
+        # Eski label’ı gizle
+        self.ui.mapShown_label.setVisible(False)
 
     def notify_user(self, message: str):
         """

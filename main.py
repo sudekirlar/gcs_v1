@@ -4,13 +4,14 @@ import sys
 from PyQt5.QtWidgets import QApplication, QMainWindow
 from newDesign import Ui_MainWindow  # Qt Designer çıkışı
 from ui.main_window_controller import MainWindowController
-
+from PyQt5.QtWebEngine import QtWebEngine
 
 def main():
     """
     Uygulamanın giriş noktası.
     Qt arayüzünü başlatır ve MainWindowController ile bağlantıyı kurar.
     """
+    QtWebEngine.initialize()
     app = QApplication(sys.argv)
 
     # Ana pencereyi oluştur
