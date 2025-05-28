@@ -12,7 +12,7 @@ from core.events.telemetry_events import (
     GPSUpdatedEvent,
     SpeedUpdatedEvent,
     HDOPUpdatedEvent,
-    ModeUpdatedEvent,
+    ModeUpdatedEvent, PositionPointReadyEvent,
 )
 from core.events.command_events import CommandAckReceivedEvent
 
@@ -39,6 +39,8 @@ class EventDispatcher(QObject):
     modeUpdated = pyqtSignal(ModeUpdatedEvent)
 
     commandAckReceived = pyqtSignal(CommandAckReceivedEvent)
+
+    positionPointReady = pyqtSignal(str)  # JSON string
 
     def __init__(self):
         super().__init__()
@@ -68,5 +70,7 @@ class EventDispatcher(QObject):
             self.modeUpdated.emit(event)
         elif isinstance(event, CommandAckReceivedEvent):
             self.commandAckReceived.emit(event)
+        elif isinstance(event, PositionPointReadyEvent):
+            self.positionPointReady.emit(event.point.to_json())
         else:
             print(f"[WARN] EventDispatcher: Bilinmeyen event tipi {type(event)}")

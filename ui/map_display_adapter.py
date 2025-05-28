@@ -20,3 +20,7 @@ class MapDisplayAdapter(QWebEngineView):
 
         self.load(QUrl.fromLocalFile(os.path.abspath(html_path)))
         self.setContextMenuPolicy(0)        # Sağ-tık menüsü kapalı
+
+    def push_position_json(self, json_str: str):
+        # Gelecek adımda QWebChannel'a taşıyacağız; şimdilik JS console'unda görelim
+        self.page().runJavaScript(f"console.log('POINT', {json_str});")

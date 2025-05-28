@@ -5,6 +5,7 @@ from PyQt5.QtCore import QObject, QThreadPool, pyqtSignal
 
 from application.controller.connection_controller import ConnectionController
 from application.controller.telemetry_controller import TelemetryController
+from application.services.position_stream_builder import PositionStreamBuilder
 
 from core.command.arm_command import ArmCommand
 from core.command.disarm_command import DisarmCommand
@@ -86,6 +87,13 @@ class MainWindowController(QObject):
 
         # Eski label’ı gizle
         self.ui.mapShown_label.setVisible(False)
+
+        self.position_builder = PositionStreamBuilder()
+
+        # dispatcher sinyalini map’e yönlendir
+        self.dispatcher.positionPointReady.connect(
+            self.map_widget.push_position_json
+        )
 
     def notify_user(self, message: str):
         """
