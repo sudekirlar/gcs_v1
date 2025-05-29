@@ -1,5 +1,4 @@
-# polyline_demo.py
-import sys, json, math, itertools, time
+import sys, json, math, itertools
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout
 from PyQt5.QtCore    import QTimer
 from ui.map_display_adapter import MapDisplayAdapter
@@ -40,6 +39,11 @@ def push_next():
     pkt = json.dumps(dict(latitude=lat, longitude=lon, yaw=yaw))
     map_w.push_position_json(pkt)
 
+#  ❖ 4 – Test: Dinamik zoom'u belli süre sonra devre dışı bırak, sonra yeniden etkinleştir
+QTimer.singleShot(10_000, lambda: (print('[TEST] Disabling auto-follow'), map_w.disable_auto_follow()))
+QTimer.singleShot(20_000, lambda: (print('[TEST] Enabling auto-follow'), map_w.enable_auto_follow()))
+
+# Başlatma
 timer = QTimer()
 timer.timeout.connect(push_next)
 timer.start(DELAY_MS)

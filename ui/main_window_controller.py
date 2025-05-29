@@ -78,6 +78,7 @@ class MainWindowController(QObject):
         self.ui.changeMode_pushButton.clicked.connect(self.handle_set_mode_command)
         self.ui.takeOff_pushButton.clicked.connect(self.handle_takeoff_command)
         self.ui.land_pushButton.clicked.connect(self.handle_land_command)
+        self.ui.goToFocus_pushButton.clicked.connect(self.handle_focus_button)
 
         # Harita widget’ı oluştur
         self.map_widget = MapDisplayAdapter(parent=self.ui.centralwidget)
@@ -184,3 +185,6 @@ class MainWindowController(QObject):
             self.notify_user(f"[ACK] Komut {event.command_id} başarıyla alındı.")
         else:
             self.notify_user(f"[ACK] Komut {event.command_id} reddedildi. Kod: {event.result}")
+
+    def handle_focus_button(self):
+        self.map_widget.focus_on_drone()

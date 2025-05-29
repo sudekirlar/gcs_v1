@@ -1,9 +1,9 @@
-# ui/map_display_adapter.py
-
-import json, pathlib
-from PyQt5.QtWebEngineWidgets import QWebEngineView
-from PyQt5.QtCore import QUrl
+import json
+import pathlib
 import os
+
+from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineSettings
+from PyQt5.QtCore import QUrl
 
 class MapDisplayAdapter(QWebEngineView):
     """OpenLayers haritasını yükler; GUI katmanından bağımsızdır."""
@@ -11,8 +11,14 @@ class MapDisplayAdapter(QWebEngineView):
     def __init__(self, parent=None):
         super().__init__(parent)
 
+        # WebEngine ayarları: JS ve yerel dosya erişimini aktifleştir
+        settings = self.settings()
+        settings.setAttribute(QWebEngineSettings.JavascriptEnabled, True)
+        settings.setAttribute(QWebEngineSettings.LocalContentCanAccessFileUrls, True)
+        settings.setAttribute(QWebEngineSettings.LocalContentCanAccessRemoteUrls, True)
+
         self._page_ready = False
-        self._queue = []  # bekleyen JS komutları
+        self._queue = []  # Bekleyen JS komutları
         self.loadFinished.connect(self._on_load_finished)
 
         # ↘︎  kök dizin =  …/gcs/
@@ -23,7 +29,8 @@ class MapDisplayAdapter(QWebEngineView):
         print("[MAP] Exists?   :", html_path.exists())
 
         self.load(QUrl.fromLocalFile(os.path.abspath(html_path)))
-        self.setContextMenuPolicy(0)        # Sağ-tık menüsü kapalı
+        # Sağ-tık menüsünü geçici olarak açılabilir bırakın, debug için inspect desteği
+        # self.setContextMenuPolicy(0)  # Sağ-tık menüsü kapalı
 
     def _on_load_finished(self, ok: bool):
         self._page_ready = ok
@@ -33,7 +40,7 @@ class MapDisplayAdapter(QWebEngineView):
 
     def _emit_js(self, cmd: str):
         if self._page_ready:
-            print("[MAP] JS >", cmd[:60])  # ◀︎ ekle
+            print("[MAP] JS >", cmd[:60])
             self.page().runJavaScript(cmd)
         else:
             self._queue.append(cmd)
@@ -43,6 +50,19 @@ class MapDisplayAdapter(QWebEngineView):
             d = json.loads(json_str)
             lat, lon, yaw = d["latitude"], d["longitude"], d["yaw"]
         except (KeyError, json.JSONDecodeError):
-            print("[MAP] Bad JSON:", json_str);
+            print("[MAP] Bad JSON:", json_str)
             return
+        # JS tarafında updatePose çağrısı
         self._emit_js(f"updatePose({lat}, {lon}, {yaw});")
+
+    def focus_on_drone(self):
+        """Kullanıcı butona basınca tekrar auto-follow başlat ve odakla."""
+        self._emit_js("enableAutoFollowAndFocus();")
+
+    def enable_auto_follow(self):
+        """Dinamik zoom'u yeniden etkinleştir."""
+        self._emit_js("enableAutoFollowAndFocus();")
+
+    def disable_auto_follow(self):
+        """Dinamik zoom'u devre dışı bırak."""
+        self._emit_js("disableAutoFollow();")

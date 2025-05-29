@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <title>GCS Map</title>
 
-  <!-- OpenLayers CDN -->
+  <!-- OpenLayers CSS -->
   <link rel="stylesheet"
         href="https://cdn.jsdelivr.net/npm/ol@latest/ol.css" />
   <style>
@@ -50,7 +50,7 @@
   /* ---------- Polyline ---------- */
   const pathLine    = new ol.geom.LineString([]);
   const pathFeature = new ol.Feature(pathLine);
-  pathFeature.setStyle(                       // Tüm temalarda görünür turuncu
+  pathFeature.setStyle(
     new ol.style.Style({
       stroke: new ol.style.Stroke({ color: '#FF6200', width: 2 })
     })
@@ -62,29 +62,61 @@
   });
   map.addLayer(vectorLayer);
 
+  /* ---------- AUTO-FOLLOW bayrağı ---------- */
+  let autoFollow = true;
+
+  /* Kullanıcı haritayı elle oynatırsa auto-follow'u kapat */
+  map.on('movestart', evt => {
+    if (evt.originalEvent) autoFollow = false;
+  });
+  // Ek etkileşimler: fare/drag/zoom ile de devre dışı bırak
+  map.on('pointerdrag',       () => { autoFollow = false; });
+  map.getView().on('change:resolution', () => { autoFollow = false; });
+  map.getViewport().addEventListener('pointerdown', () => { autoFollow = false; });
+
+  /* Polyline'i ekrana sığdıran yardımcı */
+  function fitPath() {
+    map.getView().fit(pathLine, {
+      padding : [50, 50, 50, 50],   // px kenar boşluk
+      maxZoom : 18,                 // fazla yakınlaşma engeli
+      duration: 300                 // animasyon ms
+    });
+  }
+
+  /* Python → haritaya odak dönüş düğmesi */
+  function enableAutoFollowAndFocus() {
+    autoFollow = true;
+    if (pathLine.getCoordinates().length) fitPath();
+  }
+
+  /* —— YENİ EKLENDİ: Dinamik zoom’u JS tarafında devre dışı bırakmak için —— */
+  function disableAutoFollow() {
+    autoFollow = false;
+  }
+  /* ———————————————————————————————————————————————————————————————— */
+
   /* ===========================================================
        TEK GİRİŞ NOKTASI ── Python:  updatePose(lat, lon, yaw)
      =========================================================== */
   function updatePose(lat, lon, yawDeg)
   {
-    console.log('updatePose', lat, lon, yawDeg);      // debug
-
     const coord = ol.proj.fromLonLat([lon, lat]);
 
-    /* 1) Konum */
+    /* 1) Konum + isteğe bağlı merkezleme */
     droneFeature.getGeometry().setCoordinates(coord);
-    map.getView().setCenter(coord);
+    if (autoFollow) map.getView().setCenter(coord);
 
     /* 2) Yön  (OpenLayers saat yönünü (+) kabul ediyor) */
     droneStyle.getImage().setRotation(-yawDeg * Math.PI / 180);
-    droneFeature.changed();                           // redraw
+    droneFeature.changed();
 
-    /* 3) Polyline */
+    /* 3) Polyline  + ring-buffer */
     pathLine.appendCoordinate(coord);
-    if (pathLine.getCoordinates().length > 2000)      // ring-buffer
-        pathLine.setCoordinates(
-          pathLine.getCoordinates().slice(-2000)
-        );
+    if (pathLine.getCoordinates().length > 2000)
+        pathLine.setCoordinates(pathLine.getCoordinates().slice(-2000));
+
+    /* 4) Çizgiyi ekrana sığdır */
+    if (autoFollow) fitPath();
   }
   </script>
 </body>
