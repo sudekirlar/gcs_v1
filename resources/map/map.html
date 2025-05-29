@@ -103,6 +103,13 @@
       // c) Dinamik zoom kontrolörünü bilgilendir
       dz.update(coord);
     };
+
+    // 5) Python’dan clearPath çağrısı
+    window.clearPath = () => {
+      pathLine.setCoordinates([]);
+      if (window.dz) window.dz._lastExtent = null;
+    };
+
   </script>
 </body>
 </html>

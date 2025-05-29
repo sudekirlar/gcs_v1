@@ -1,7 +1,7 @@
 # ui/main_window_controller.py
 
-from PyQt5.QtWidgets import QMessageBox
-from PyQt5.QtCore import QObject, QThreadPool, pyqtSignal
+from PyQt5.QtWidgets import QMessageBox, QPushButton
+from PyQt5.QtCore import QObject, QThreadPool, pyqtSignal, QTimer
 
 from application.controller.connection_controller import ConnectionController
 from application.controller.telemetry_controller import TelemetryController
@@ -24,6 +24,11 @@ from core.events.telemetry_events import (
 from core.events.command_events import CommandAckReceivedEvent
 from core.command.land_command import LandCommand
 from ui.map_display_adapter import MapDisplayAdapter
+
+# test imports
+import itertools
+import json
+import math
 
 class MainWindowController(QObject):
     gui_notify = pyqtSignal(str)  # ✅ Thread-safe GUI güncellemesi için sinyal
@@ -79,6 +84,7 @@ class MainWindowController(QObject):
         self.ui.takeOff_pushButton.clicked.connect(self.handle_takeoff_command)
         self.ui.land_pushButton.clicked.connect(self.handle_land_command)
         self.ui.goToFocus_pushButton.clicked.connect(self.handle_focus_button)
+        self.ui.clearPath_pushButton.clicked.connect(self.handle_clear_path)
 
         # Harita widget’ı oluştur
         self.map_widget = MapDisplayAdapter(parent=self.ui.centralwidget)
@@ -95,6 +101,20 @@ class MainWindowController(QObject):
 
         self.dispatcher.positionPointReady.connect(
             self.map_widget.push_position_json)
+
+        # test butonu
+        # ■■■ Test Butonu: Sol alt köşede "Start Demo" ■■■
+        self.startDemo_pushButton = QPushButton("Start Demo", parent=self.ui.centralwidget)
+        # 10 px soldan, 10 px alttan
+        height = self.ui.mapShown_label.geometry().height()
+        self.startDemo_pushButton.setGeometry(10, height - 40, 100, 30)
+        self.startDemo_pushButton.clicked.connect(self.handle_start_demo)
+
+        # Demo timer ve iterator
+        self.demo_timer = QTimer(self)
+        self.demo_timer.setInterval(100)
+        self.demo_timer.timeout.connect(self.push_demo_position)
+        self.pos_iter = None
 
     def notify_user(self, message: str):
         """
@@ -188,3 +208,43 @@ class MainWindowController(QObject):
 
     def handle_focus_button(self):
         self.map_widget.focus_on_drone()
+
+    def handle_clear_path(self):
+        """Clear Path Butonuna basılınca polyline’ı temizle."""
+        self.map_widget._emit_js("clearPath();")
+        self.notify_user("[Map] Path temizlendi.")
+
+    # test funcs
+    def map_position_handler(self, event):
+        # Dispatcher çağrısıyla gelen poz JSON'u direkt JS'e ilet
+        pkt = json.dumps({
+            'latitude': event.latitude,
+            'longitude': event.longitude,
+            'yaw': event.yaw
+        })
+        self.map_widget.push_position_json(pkt)
+
+    def handle_start_demo(self):
+        """Start Demo butonuna basılınca fake JSON üretimi başlat."""
+        self.pos_iter = self._gen_positions()
+        self.map_widget.enable_auto_follow()
+        self.demo_timer.start()
+        self.notify_user("[Demo] Başladı")
+
+    def push_demo_position(self):
+        if not self.pos_iter:
+            return
+        lat, lon, yaw = next(self.pos_iter)
+        pkt = json.dumps({'latitude': lat, 'longitude': lon, 'yaw': yaw})
+        self.map_widget.push_position_json(pkt)
+
+    def _gen_positions(self):
+        CENTER_LAT = 37.06257608177816
+        CENTER_LON = 35.35287244257858
+        RADIUS = 0.0005
+        for t in itertools.count():
+            theta = (t * 2 * math.pi) / 600
+            lat = CENTER_LAT + RADIUS * math.sin(theta)
+            lon = CENTER_LON + RADIUS * math.cos(theta)
+            yaw = (theta * 180 / math.pi + 90) % 360
+            yield lat, lon, yaw
