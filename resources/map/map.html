@@ -110,6 +110,32 @@
       if (window.dz) window.dz._lastExtent = null;
     };
 
+    // → marker’ları tutmak için global dizi
+    let markerFeatures = [];
+
+    // 5) Python’dan gelen addMarker çağrısı
+    window.addMarker = () => {
+      const coord = droneFeature.getGeometry().getCoordinates();
+      const marker = new ol.Feature(new ol.geom.Point(coord));
+      marker.setStyle(new ol.style.Style({
+        image: new ol.style.Circle({
+          radius: 6,
+          fill:   new ol.style.Fill({   color: 'blue' }),
+          stroke: new ol.style.Stroke({ color: 'white', width: 2 })
+        })
+      }));
+      vectorLayer.getSource().addFeature(marker);
+      markerFeatures.push(marker);
+    };
+
+    // 6) Python’dan gelen clearMarkers çağrısı
+    window.clearMarkers = () => {
+      const src = vectorLayer.getSource();
+      markerFeatures.forEach(f => src.removeFeature(f));
+      markerFeatures.length = 0;
+    };
+
+
   </script>
 </body>
 </html>

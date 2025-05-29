@@ -85,6 +85,8 @@ class MainWindowController(QObject):
         self.ui.land_pushButton.clicked.connect(self.handle_land_command)
         self.ui.goToFocus_pushButton.clicked.connect(self.handle_focus_button)
         self.ui.clearPath_pushButton.clicked.connect(self.handle_clear_path)
+        self.ui.addMarker_pushButton.clicked.connect(self.handle_add_marker)
+        self.ui.clearMarker_pushButton.clicked.connect(self.handle_clear_markers)
 
         # Harita widget’ı oluştur
         self.map_widget = MapDisplayAdapter(parent=self.ui.centralwidget)
@@ -213,6 +215,16 @@ class MainWindowController(QObject):
         """Clear Path Butonuna basılınca polyline’ı temizle."""
         self.map_widget._emit_js("clearPath();")
         self.notify_user("[Map] Path temizlendi.")
+
+    def handle_add_marker(self):
+        """Drone konumuna marker ekle."""
+        self.map_widget._emit_js("addMarker();")
+        self.notify_user("[Map] Marker eklendi.")
+
+    def handle_clear_markers(self):
+        """Tüm marker’ları temizle."""
+        self.map_widget._emit_js("clearMarkers();")
+        self.notify_user("[Map] Markerlar temizlendi.")
 
     # test funcs
     def map_position_handler(self, event):
