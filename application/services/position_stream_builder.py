@@ -30,4 +30,5 @@ class PositionStreamBuilder:
     def _try_emit(self):
         if None not in (self._yaw, self._lat, self._lon):
             point = PositionPoint(self._yaw, self._lat, self._lon)
+            print("[JSON]", point.to_json())
             EventBus.publish(PositionPointReadyEvent(point))

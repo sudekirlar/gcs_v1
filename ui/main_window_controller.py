@@ -19,7 +19,7 @@ from utils.event_dispatcher import EventDispatcher
 from core.events.telemetry_events import (
     TelemetryDataEvent,
     YawPitchRollUpdatedEvent, GPSUpdatedEvent,
-    SpeedUpdatedEvent, HDOPUpdatedEvent, ModeUpdatedEvent
+    SpeedUpdatedEvent, HDOPUpdatedEvent, ModeUpdatedEvent, PositionPointReadyEvent
 )
 from core.events.command_events import CommandAckReceivedEvent
 from core.command.land_command import LandCommand
@@ -61,6 +61,7 @@ class MainWindowController(QObject):
         EventBus.subscribe(HDOPUpdatedEvent, self.dispatcher.dispatch)
         EventBus.subscribe(ModeUpdatedEvent, self.dispatcher.dispatch)
         EventBus.subscribe(CommandAckReceivedEvent, self.dispatcher.dispatch)
+        EventBus.subscribe(PositionPointReadyEvent, self.dispatcher.dispatch)
 
         # Thread-safe GUI mesajı için sinyali bağla
         self.gui_notify.connect(self.ui.currentState_textEdit_2.setText)
@@ -90,10 +91,9 @@ class MainWindowController(QObject):
 
         self.position_builder = PositionStreamBuilder()
 
-        # dispatcher sinyalini map’e yönlendir
+
         self.dispatcher.positionPointReady.connect(
-            self.map_widget.push_position_json
-        )
+            self.map_widget.push_position_json)
 
     def notify_user(self, message: str):
         """
