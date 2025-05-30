@@ -2,8 +2,10 @@ import json
 import pathlib
 import os
 
+from PyQt5.QtWebChannel import QWebChannel
 from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineSettings
 from PyQt5.QtCore import QUrl
+from application.map_bridge.js_bridge import JsBridge
 
 class MapDisplayAdapter(QWebEngineView):
     """OpenLayers haritasını yükler; GUI katmanından bağımsızdır."""
@@ -31,6 +33,12 @@ class MapDisplayAdapter(QWebEngineView):
         self.load(QUrl.fromLocalFile(os.path.abspath(html_path)))
         # Sağ-tık menüsünü geçici olarak açılabilir bırakın, debug için inspect desteği
         # self.setContextMenuPolicy(0)  # Sağ-tık menüsü kapalı
+
+        # WebChannel kurulumunu loadFinished’ın hemen ardından yapalım
+        self._channel = QWebChannel(self.page())
+        self._bridge = JsBridge()
+        self._channel.registerObject("bridge", self._bridge)
+        self.page().setWebChannel(self._channel)
 
     def _on_load_finished(self, ok: bool):
         self._page_ready = ok
