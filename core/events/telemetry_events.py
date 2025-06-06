@@ -1,4 +1,6 @@
 # core/events/telemetry_events.py
+from core.dto.position_point import PositionPoint
+
 
 class TelemetryDataEvent:
     """
@@ -45,3 +47,8 @@ class HDOPUpdatedEvent:
 class ModeUpdatedEvent:
     def __init__(self, mode):
         self.mode = mode
+
+class PositionPointReadyEvent:
+    def __init__(self, point: "PositionPoint"):
+        self.point = point
+
