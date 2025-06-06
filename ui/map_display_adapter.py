@@ -4,11 +4,13 @@ import os
 
 from PyQt5.QtWebChannel import QWebChannel
 from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineSettings
-from PyQt5.QtCore import QUrl
+from PyQt5.QtCore import QUrl, pyqtSignal
 from application.map_bridge.js_bridge import JsBridge
 
 class MapDisplayAdapter(QWebEngineView):
     """OpenLayers haritasını yükler; GUI katmanından bağımsızdır."""
+    # Harita ve bridge hazır olduğunda emit edilecek sinyal
+    mapReady = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -34,17 +36,25 @@ class MapDisplayAdapter(QWebEngineView):
         # Sağ-tık menüsünü geçici olarak açılabilir bırakın, debug için inspect desteği
         # self.setContextMenuPolicy(0)  # Sağ-tık menüsü kapalı
 
-        # WebChannel kurulumunu loadFinished’ın hemen ardından yapalım
+        # WebChannel kurulumu hemen yapılıyor (loadFinished içine taşınmadı)
         self._channel = QWebChannel(self.page())
         self._bridge = JsBridge()
         self._channel.registerObject("bridge", self._bridge)
         self.page().setWebChannel(self._channel)
 
     def _on_load_finished(self, ok: bool):
+        # Sayfa yüklendiğinde _page_ready = True, kuyruktakileri çalıştır
         self._page_ready = ok
         for cmd in self._queue:
             self.page().runJavaScript(cmd)
         self._queue.clear()
+
+        # Harita ve bridge hazır, sinyal emit et
+        if ok:
+            print("[MAP] mapReady signal emit ediliyor.")
+            self.mapReady.emit()
+        else:
+            print("[MAP] loadFinished: başarısız yükleme.")
 
     def _emit_js(self, cmd: str):
         if self._page_ready:

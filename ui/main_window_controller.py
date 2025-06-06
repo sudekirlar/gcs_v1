@@ -1,4 +1,5 @@
 # ui/main_window_controller.py
+from pathlib import Path
 
 from PyQt5.QtWidgets import QMessageBox, QPushButton
 from PyQt5.QtCore import QObject, QThreadPool, pyqtSignal, QTimer
@@ -103,6 +104,16 @@ class MainWindowController(QObject):
 
         self.dispatcher.positionPointReady.connect(
             self.map_widget.push_position_json)
+
+        base_dir = Path(__file__).resolve().parents[2]
+        self.temp_mem_path = base_dir / "resources" / "map" / "temp_mem.json"
+        self.temp_mem_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # “Save Mission” butonunu bağla
+        try:
+            self.ui.saveMission_pushButton.clicked.connect(self.handle_save_mission)
+        except Exception:
+            pass
 
         # test butonu
         # ■■■ Test Butonu: Sol alt köşede "Start Demo" ■■■
@@ -225,6 +236,37 @@ class MainWindowController(QObject):
         """Tüm marker’ları temizle."""
         self.map_widget._emit_js("clearMarkers();")
         self.notify_user("[Map] Markerlar temizlendi.")
+
+    def _on_map_ready(self):
+        """
+        Harita ve köprü (JsBridge) hazır olduğunda bu tetiklenir.
+        Burada, JsBridge’ten gelen özet mesajları currentState_textEdit_2'ye ileteceğiz.
+        """
+        bridge = self.map_widget._bridge
+        bridge.waypointUpdated.connect(self._on_waypoint_updated)
+        print("[MainWindowController] mapReady alındı. JsBridge sinyali bağlandı.")
+        self.notify_user("Harita hazır, WP işlemleri dinleniyor.")
+
+    def _on_waypoint_updated(self, msg: str):
+        """
+        JsBridge’in waypointUpdated(msg) sinyalini burda yakala.
+        msg örneği: "Eklendi: (37.06, 35.35) ─ Toplam: 3" veya "Silindi: (...)"
+        """
+        self.notify_user(msg)
+
+    def handle_save_mission(self):
+        """
+        temp_mem.json dosyasını baştan "{ 'waypoints': [] }" ile yazar.
+        """
+        empty = {"waypoints": []}
+        try:
+            with open(self.temp_mem_path, "w", encoding="utf-8") as f:
+                json.dump(empty, f, indent=2, ensure_ascii=False)
+            print(f"[MainWindowController][DEBUG] temp_mem.json sıfırlandı (Save Mission).")
+            self.notify_user("Geçici WP belleği temizlendi (Save Mission).")
+        except Exception as e:
+            print(f"[MainWindowController][ERROR] Save Mission temizleme hatası: {e}")
+            self.notify_user("[Hata] Save Mission sırasında temp_mem temizlenemedi.")
 
     # test funcs
     def map_position_handler(self, event):
