@@ -60,50 +60,55 @@ class JsBridge(QObject):
     @pyqtSlot(str)
     def saveWaypoint(self, json_str: str):
         """
-        JS: window.pushWaypointJSON(JSON.stringify({latitude:...,longitude:...}))
-        çağrıldığında bu çalışır.
-        1) JSON parse edilir,
-        2) temp_mem.json'a eklenir,
-        3) terminale detaylı debug basılır,
-        4) waypointUpdated sinyali özet mesajiyla emit edilir.
+        JS tarafından gelen {"latitude":.., "longitude":.., "altitude":..} dizgesini
+        parse eder, temp_mem.json'a ekler, detaylı log basar ve özet sinyal emit eder.
         """
         print(f"[JsBridge] saveWaypoint tetiklendi: {json_str}")
         try:
             wp = json.loads(json_str)
-            lat = wp["latitude"]
-            lon = wp["longitude"]
+            lat = float(wp["latitude"])
+            lon = float(wp["longitude"])
+            alt = wp.get("altitude", None)
+            if alt is not None:
+                alt = float(alt)
         except Exception as e:
-            print(f"[JsBridge][ERROR] JSON parse hatası: {e}, incoming: {json_str}")
+            print(f"[JsBridge][ERROR] JSON parse hatası: {e}, gelen: {json_str}")
             return
 
+        entry = {"latitude": lat, "longitude": lon}
+        if alt is not None:
+            entry["altitude"] = alt
+
         wplist = self._read_waypoints()
-        wplist.append({"latitude": lat, "longitude": lon})
+        wplist.append(entry)
         self._write_waypoints(wplist)
 
         # Detaylı terminal log
-        print(f"[JsBridge][DEBUG] Yeni waypoint eklendi → ({lat:.6f}, {lon:.6f})")
+        if alt is not None:
+            print(f"[JsBridge][DEBUG] Eklendi → lat: {lat:.6f}, lon: {lon:.6f}, alt: {alt:.2f} m")
+        else:
+            print(f"[JsBridge][DEBUG] Eklendi → lat: {lat:.6f}, lon: {lon:.6f}")
         print(f"[JsBridge][DEBUG] Toplam waypoint sayısı: {len(wplist)}")
-        print(
-            f"[JsBridge][DEBUG] temp_mem.json içeriği:\n{json.dumps({'waypoints': wplist}, indent=2, ensure_ascii=False)}")
+        print(f"[JsBridge][DEBUG] temp_mem.json içeriği:\n"
+              f"{json.dumps({'waypoints': wplist}, indent=2, ensure_ascii=False)}")
 
-        # Kısaca UI’a özet metin gönder:
-        msg = f"Eklendi: ({lat:.6f}, {lon:.6f}) ─ Toplam: {len(wplist)}"
+        # Özet mesajı emit et
+        if alt is not None:
+            msg = f"Eklendi: ({lat:.6f}, {lon:.6f}, {alt:.1f} m) ─ Toplam: {len(wplist)}"
+        else:
+            msg = f"Eklendi: ({lat:.6f}, {lon:.6f}) ─ Toplam: {len(wplist)}"
         self.waypointUpdated.emit(msg)
 
     @pyqtSlot()
     def removeWaypoint(self):
         """
-        JS: window.pushWaypointRemoveJSON() çağrıldığında bu çalışır.
-        1) Dosyadan liste okunur,
-        2) Son eleman pop edilir,
-        3) temp_mem.json güncellenir,
-        4) debug basılır,
-        5) waypointUpdated sinyali özet mesajla emit edilir.
+        JS: window.pushWaypointRemoveJSON() çağrıldığında
+        temp_mem.json'dan son waypoint'i çıkarır, log basar, özet sinyal emit eder.
         """
         print(f"[JsBridge] removeWaypoint tetiklendi.")
         wplist = self._read_waypoints()
         if not wplist:
-            print("[JsBridge][DEBUG] Waypoint silme: liste zaten boş.")
+            print("[JsBridge][DEBUG] Silinecek waypoint yok.")
             self.waypointUpdated.emit("Silinecek waypoint yok.")
             return
 
@@ -112,12 +117,20 @@ class JsBridge(QObject):
 
         lat = removed.get("latitude")
         lon = removed.get("longitude")
-        # Detaylı terminal log
-        print(f"[JsBridge][DEBUG] Son waypoint silindi → ({lat:.6f}, {lon:.6f})")
-        print(f"[JsBridge][DEBUG] Kalan waypoint sayısı: {len(wplist)}")
-        print(
-            f"[JsBridge][DEBUG] temp_mem.json içeriği:\n{json.dumps({'waypoints': wplist}, indent=2, ensure_ascii=False)}")
+        alt = removed.get("altitude", None)
 
-        # Kısaca UI’a özet metin:
-        msg = f"Silindi: ({lat:.6f}, {lon:.6f}) ─ Kalan: {len(wplist)}"
+        # Detaylı terminal log
+        if alt is not None:
+            print(f"[JsBridge][DEBUG] Silindi → lat: {lat:.6f}, lon: {lon:.6f}, alt: {alt:.2f} m")
+        else:
+            print(f"[JsBridge][DEBUG] Silindi → lat: {lat:.6f}, lon: {lon:.6f}")
+        print(f"[JsBridge][DEBUG] Kalan waypoint sayısı: {len(wplist)}")
+        print(f"[JsBridge][DEBUG] temp_mem.json içeriği:\n"
+              f"{json.dumps({'waypoints': wplist}, indent=2, ensure_ascii=False)}")
+
+        # Özet mesajı emit et
+        if alt is not None:
+            msg = f"Silindi: ({lat:.6f}, {lon:.6f}, {alt:.1f} m) ─ Kalan: {len(wplist)}"
+        else:
+            msg = f"Silindi: ({lat:.6f}, {lon:.6f}) ─ Kalan: {len(wplist)}"
         self.waypointUpdated.emit(msg)

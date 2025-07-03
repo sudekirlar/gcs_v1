@@ -1,253 +1,415 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>GCS Map</title>
+  <head>
+    <meta charset="UTF-8" />
+    <title>GCS Map</title>
 
-  <!-- OpenLayers CSS -->
-  <link rel="stylesheet"
-        href="https://cdn.jsdelivr.net/npm/ol@latest/ol.css" />
-  <style>
-    html, body { margin: 0; height: 100% }
-    #map       { width: 100%; height: 100%; position: relative;}
+    <!-- OpenLayers CSS -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/ol@latest/ol.css"
+    />
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+      }
+      #map {
+        width: 100%;
+        height: 100%;
+        position: relative;
+      }
 
-    /* WP Toggle Control */
-    .toggle-WP {
-      position: absolute;
-      top: .5em;
-      right: .5em;
-      z-index: 1000;
-    }
-    .toggle-WP button {
-      background: white;
-      border: 1px solid #ccc;
-      padding: 5px 15px;
-      display: inline-flex;         /* Flex konteyner yapar */
-      align-items: center;          /* Dikey ortalar */
-      justify-content: center;      /* Yatay ortalar */
-      text-align: center;           /* Ekstra yatay ortalama */
-      font-size: 0.8rem;
-      line-height: 0.9;
-      margin-left: 1px;
-      min-height: 36px;
-      cursor: pointer;
-    }
-    .toggle-WP button.active {
-      background: #007ACC;
-      color: white;
-    }
-  </style>
-</head>
-<body>
+      /* WP Toggle Control */
+      .toggle-WP {
+        position: absolute;
+        top: 0.5em;
+        right: 0.5em;
+        z-index: 1000;
+      }
+      .toggle-WP button {
+        background: white;
+        border: 1px solid #ccc;
+        padding: 5px 15px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        font-size: 0.8rem;
+        line-height: 0.9;
+        margin-left: 1px;
+        min-height: 36px;
+        cursor: pointer;
+      }
+      .toggle-WP button.active {
+        background: #007acc;
+        color: white;
+      }
 
-  <!-- WP Yerleştirme Modu ve Silme Kontrolleri -->
-  <div class="toggle-WP ol-unselectable ol-control">
-    <button id="wpToggle">WP Koy</button>
-    <button id="wpUndo">WP Sil</button>
-  </div>
+      /* ---------- ALTITUDE CARD STYLES ---------- */
+      .alt-card {
+        position: absolute;
+        background: rgba(255, 255, 255, 0.9);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+        border-radius: 4px;
+        padding: 8px 12px;
+        font-size: 0.85rem;
+        z-index: 2000;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        pointer-events: auto;
+        opacity: 1;
+        transition: opacity 0.2s ease;
+      }
+      .alt-card.closing {
+        opacity: 0;
+      }
+      .alt-card .close-btn {
+        position: absolute;
+        top: 2px;
+        right: 4px;
+        font-size: 0.9rem;
+        background: transparent;
+        border: none;
+        color: #666;
+        cursor: pointer;
+        padding: 0;
+        line-height: 1;
+      }
+      .alt-card input {
+        width: 4em;
+        padding: 2px 4px;
+        border: 1px solid #ccc;
+        border-radius: 3px;
+        font-size: 0.85rem;
+      }
+      .alt-card input.invalid {
+        border-color: #e03e2d;
+      }
+      .alt-card input.valid {
+        border-color: #28a745;
+      }
+      .alt-card button {
+        background: #007acc;
+        color: white;
+        border: none;
+        padding: 2px 6px;
+        border-radius: 3px;
+        cursor: pointer;
+        font-size: 0.75rem;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- WP Yerleştirme Modu ve Silme Kontrolleri -->
+    <div class="toggle-WP ol-unselectable ol-control">
+      <button id="wpToggle">WP Koy</button>
+      <button id="wpUndo">WP Sil</button>
+    </div>
 
-  <div id="map"></div>
+    <div id="map"></div>
 
-  <!-- QWebChannel JS (must come before any script that uses `qt.webChannelTransport`) -->
-  <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
-  <!-- OpenLayers -->
-  <script src="https://cdn.jsdelivr.net/npm/ol@latest/dist/ol.js"></script>
-  <!-- Dynamic Zoom Controller -->
-  <script src="./dynamicZoomController.js"></script>
+    <!-- QWebChannel JS (must come before any script that uses `qt.webChannelTransport`) -->
+    <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+    <!-- OpenLayers -->
+    <script src="https://cdn.jsdelivr.net/npm/ol@latest/dist/ol.js"></script>
+    <!-- Dynamic Zoom Controller -->
+    <script src="./dynamicZoomController.js"></script>
 
-  <script>
+    <script>
+      //--------------------------------------------------
+      // 4) QWebChannel Initialization
+      //--------------------------------------------------
+      let bridgeReady = false;
+      window.pushWaypointJSON = () => {};
+      window.pushWaypointRemoveJSON = () => {};
+      new QWebChannel(qt.webChannelTransport, (channel) => {
+        window.bridge = channel.objects.bridge;
+        window.pushWaypointJSON = (json) => bridge.saveWaypoint(json);
+        window.pushWaypointRemoveJSON = () => bridge.removeWaypoint();
+        bridgeReady = true;
+      });
 
-    //--------------------------------------------------
-    // 4) QWebChannel Initialization
-    //--------------------------------------------------
-    let bridgeReady = false;
-    window.pushWaypointJSON       = () => {};
-    window.pushWaypointRemoveJSON = () => {};
-    new QWebChannel(qt.webChannelTransport, channel => {
-      window.bridge = channel.objects.bridge;
-      window.pushWaypointJSON = json => bridge.saveWaypoint(json);
-      window.pushWaypointRemoveJSON = () => bridge.removeWaypoint();
-      bridgeReady = true;
-    });
+      const HOME_LAT = 37.06257608177816,
+        HOME_LON = 35.35287244257858,
+        ZOOM_INIT = 18;
 
-    const HOME_LAT  = 37.06257608177816,
-          HOME_LON  = 35.35287244257858,
-          ZOOM_INIT = 18;
+      // Harita ve view
+      const map = new ol.Map({
+        target: "map",
+        layers: [new ol.layer.Tile({ source: new ol.source.OSM() })],
+        view: new ol.View({
+          center: ol.proj.fromLonLat([HOME_LON, HOME_LAT]),
+          zoom: ZOOM_INIT,
+        }),
+      });
+      const view = map.getView();
 
-    // Harita ve view
-    const map = new ol.Map({
-      target: 'map',
-      layers: [
-        new ol.layer.Tile({ source: new ol.source.OSM() })
-      ],
-      view: new ol.View({
-        center: ol.proj.fromLonLat([HOME_LON, HOME_LAT]),
-        zoom:   ZOOM_INIT
-      })
-    });
-    const view = map.getView();
+      // Drone ikon & path
+      const droneStyle = new ol.style.Style({
+        image: new ol.style.Icon({
+          src: "drone.png",
+          anchor: [0.5, 0.5],
+          rotateWithView: true,
+          scale: 0.08,
+        }),
+      });
+      const droneFeature = new ol.Feature(
+        new ol.geom.Point(ol.proj.fromLonLat([HOME_LON, HOME_LAT]))
+      );
+      droneFeature.setStyle(droneStyle);
 
-    // Drone ikon & path
-    const droneStyle = new ol.style.Style({
-      image: new ol.style.Icon({
-        src: 'drone.png',
-        anchor: [0.5, 0.5],
-        rotateWithView: true,
-        scale: 0.08
-      })
-    });
-    const droneFeature = new ol.Feature(
-      new ol.geom.Point(ol.proj.fromLonLat([HOME_LON, HOME_LAT]))
-    );
-    droneFeature.setStyle(droneStyle);
-
-    const pathLine = new ol.geom.LineString([]);
-    const pathFeature = new ol.Feature(pathLine);
-    pathFeature.setStyle(new ol.style.Style({
-      stroke: new ol.style.Stroke({ color: '#FF6200', width: 2 })
-    }));
-
-    // Ana katman: drone + path
-    const vectorLayer = new ol.layer.Vector({
-      source: new ol.source.Vector({ features: [ pathFeature, droneFeature ] })
-    });
-    map.addLayer(vectorLayer);
-
-    // Waypoint katmanı (kırmızı halkalar)
-    const waypointLayer = new ol.layer.Vector({
-      source: new ol.source.Vector(),
-      style: new ol.style.Style({
-        image: new ol.style.Circle({
-          radius: 6,
-          fill:   new ol.style.Fill({   color: 'red' }),
-          stroke: new ol.style.Stroke({ color: 'white', width: 2 })
+      const pathLine = new ol.geom.LineString([]);
+      const pathFeature = new ol.Feature(pathLine);
+      pathFeature.setStyle(
+        new ol.style.Style({
+          stroke: new ol.style.Stroke({ color: "#FF6200", width: 2 }),
         })
-      })
-    });
-    map.addLayer(waypointLayer);
+      );
 
-    // Dashed line layer (waypoint sırası)
-    const wpLine = new ol.geom.LineString([]);
-    const wpLineFeature = new ol.Feature(wpLine);
-    wpLineFeature.setStyle(new ol.style.Style({
-      stroke: new ol.style.Stroke({
-        color: '#FF6200',
-        width: 2,
-        lineDash: [10, 10]
-      })
-    }));
-    const wpLineLayer = new ol.layer.Vector({
-      source: new ol.source.Vector({ features: [ wpLineFeature ] })
-    });
-    map.addLayer(wpLineLayer);
+      // Ana katman: drone + path
+      const vectorLayer = new ol.layer.Vector({
+        source: new ol.source.Vector({ features: [pathFeature, droneFeature] }),
+      });
+      map.addLayer(vectorLayer);
 
-    // Dynamic Zoom Controller
-    const dz = new DynamicZoomController(
-      map, pathLine, view,
-      { padding: [50,50,50,50], maxZoom: 18, duration: 300, fastDuration: 0, throttleInterval: 300 }
-    );
+      // Waypoint katmanı (kırmızı halkalar)
+      const waypointLayer = new ol.layer.Vector({
+        source: new ol.source.Vector(),
+        style: new ol.style.Style({
+          image: new ol.style.Circle({
+            radius: 6,
+            fill: new ol.style.Fill({ color: "red" }),
+            stroke: new ol.style.Stroke({ color: "white", width: 2 }),
+          }),
+        }),
+      });
+      map.addLayer(waypointLayer);
 
-    // Python’dan pozisyon güncellemeleri
-    window.disableAutoFollow         = () => dz.disable();
-    window.enableAutoFollowAndFocus = () => dz.enable();
-    window.updatePose = (lat, lon, yawDeg) => {
-      const coord = ol.proj.fromLonLat([lon, lat]);
-      droneFeature.getGeometry().setCoordinates(coord);
-      droneStyle.getImage().setRotation(-yawDeg * Math.PI / 180);
-      droneFeature.changed();
-      pathLine.appendCoordinate(coord);
-      if (pathLine.getCoordinates().length > 2000) {
-        pathLine.setCoordinates(pathLine.getCoordinates().slice(-2000));
-      }
-      dz.update(coord);
-    };
-
-    window.clearPath = () => {
-      pathLine.setCoordinates([]);
-      dz._lastExtent = null;
-    };
-
-    // Marker ekleme/temizleme
-    let markerFeatures = [];
-    window.addMarker = () => {
-      const coord = droneFeature.getGeometry().getCoordinates();
-      const marker = new ol.Feature(new ol.geom.Point(coord));
-      marker.setStyle(new ol.style.Style({
-        image: new ol.style.Circle({
-          radius: 6,
-          fill:   new ol.style.Fill({   color: 'blue' }),
-          stroke: new ol.style.Stroke({ color: 'white', width: 2 })
+      // Dashed line layer (waypoint sırası)
+      const wpLine = new ol.geom.LineString([]);
+      const wpLineFeature = new ol.Feature(wpLine);
+      wpLineFeature.setStyle(
+        new ol.style.Style({
+          stroke: new ol.style.Stroke({
+            color: "#FF6200",
+            width: 2,
+            lineDash: [10, 10],
+          }),
         })
-      }));
-      vectorLayer.getSource().addFeature(marker);
-      markerFeatures.push(marker);
-    };
-    window.clearMarkers = () => {
-      const src = vectorLayer.getSource();
-      markerFeatures.forEach(f => src.removeFeature(f));
-      markerFeatures = [];
-    };
+      );
+      const wpLineLayer = new ol.layer.Vector({
+        source: new ol.source.Vector({ features: [wpLineFeature] }),
+      });
+      map.addLayer(wpLineLayer);
 
-    //--------------------------------------------------
-    // 6) WP Draw & Undo Logic
-    //--------------------------------------------------
-    const drawInteraction = new ol.interaction.Draw({
-      source: waypointLayer.getSource(),
-      type:   'Point'
-    });
+      // Dynamic Zoom Controller
+      const dz = new DynamicZoomController(
+        map,
+        pathLine,
+        view,
+        {
+          padding: [50, 50, 50, 50],
+          maxZoom: 18,
+          duration: 300,
+          fastDuration: 0,
+          throttleInterval: 300,
+        }
+      );
 
-    const waypointFeatures = [];
+      // Python’dan pozisyon güncellemeleri
+      window.disableAutoFollow = () => dz.disable();
+      window.enableAutoFollowAndFocus = () => dz.enable();
+      window.updatePose = (lat, lon, yawDeg) => {
+        const coord = ol.proj.fromLonLat([lon, lat]);
+        droneFeature.getGeometry().setCoordinates(coord);
+        droneStyle.getImage().setRotation((-yawDeg * Math.PI) / 180);
+        droneFeature.changed();
+        pathLine.appendCoordinate(coord);
+        if (pathLine.getCoordinates().length > 2000) {
+          pathLine.setCoordinates(
+            pathLine.getCoordinates().slice(-2000)
+          );
+        }
+        dz.update(coord);
+      };
 
-    drawInteraction.on('drawend', evt => {
-      const feat  = evt.feature;
-      const coord = feat.getGeometry().getCoordinates();
-      waypointFeatures.push(feat);
-      wpLine.appendCoordinate(coord);
+      window.clearPath = () => {
+        pathLine.setCoordinates([]);
+        dz._lastExtent = null;
+      };
 
-      // send to Python only once channel is ready
-      if (bridgeReady) {
-        const [lon, lat] = ol.proj.toLonLat(coord);
-        window.pushWaypointJSON(JSON.stringify({ latitude: lat, longitude: lon }));
+      // Marker ekleme/temizleme
+      let markerFeatures = [];
+      window.addMarker = () => {
+        const coord = droneFeature.getGeometry().getCoordinates();
+        const marker = new ol.Feature(
+          new ol.geom.Point(coord)
+        );
+        marker.setStyle(
+          new ol.style.Style({
+            image: new ol.style.Circle({
+              radius: 6,
+              fill: new ol.style.Fill({ color: "blue" }),
+              stroke: new ol.style.Stroke({ color: "white", width: 2 }),
+            }),
+          })
+        );
+        vectorLayer.getSource().addFeature(marker);
+        markerFeatures.push(marker);
+      };
+      window.clearMarkers = () => {
+        const src = vectorLayer.getSource();
+        markerFeatures.forEach((f) => src.removeFeature(f));
+        markerFeatures = [];
+      };
+
+      //--------------------------------------------------
+      // 6) WP Draw & Undo Logic
+      //--------------------------------------------------
+      const drawInteraction = new ol.interaction.Draw({
+        source: waypointLayer.getSource(),
+        type: "Point",
+      });
+
+      const waypointFeatures = [];
+      let placing = false;
+
+      // ---------- ALTITUDE CARD YARDIMCI FONKSİYONU ----------
+      function showAltitudeCard(pixel, onConfirm) {
+        // Sadece WP Koy modu açıksa devam et
+        if (!placing) return;
+
+        const card = document.createElement("div");
+        card.className = "alt-card";
+        card.style.left = pixel[0] + "px";
+        card.style.top = pixel[1] - 40 + "px";
+        card.innerHTML = `
+          <button class="close-btn">&times;</button>
+          <label>Altitude (m):</label>
+          <input type="number" min="0" max="10000" step="1" />
+          <button class="confirm">✓</button>
+        `;
+        document.body.appendChild(card);
+
+        const input = card.querySelector("input");
+        const btnClose = card.querySelector(".close-btn");
+        const btnOk = card.querySelector(".confirm");
+
+        // Auto-focus & Enter tuşu
+        input.focus();
+        input.addEventListener("keydown", (evt) => {
+          if (evt.key === "Enter") btnOk.click();
+        });
+
+        // Validation
+        input.addEventListener("input", () => {
+          const v = parseFloat(input.value);
+          if (isNaN(v) || v < 0 || v > 10000) {
+            input.classList.add("invalid");
+            input.classList.remove("valid");
+          } else {
+            input.classList.add("valid");
+            input.classList.remove("invalid");
+          }
+        });
+
+        // Close ikonuna tıklanınca sadece kartı kapat
+        btnClose.addEventListener("click", () => {
+          card.classList.add("closing");
+          setTimeout(() => document.body.removeChild(card), 200);
+        });
+
+        // ✓ butonuna tıklanınca önce kapan, sonra callback
+        btnOk.addEventListener("click", () => {
+          const v = parseFloat(input.value);
+          if (isNaN(v) || v < 0 || v > 10000) {
+            input.classList.add("invalid");
+            return;
+          }
+          input.classList.add("valid");
+          card.classList.add("closing");
+          setTimeout(() => {
+            document.body.removeChild(card);
+            onConfirm(v);
+          }, 150);
+        });
       }
-    });
 
-    // find the DragPan interaction for toggle
-    const dragPan = map.getInteractions().getArray().find(
-      i => i instanceof ol.interaction.DragPan
-    );
+      // Tek handler: yeni waypoint çizildiğinde altitude kartı aç, ardından JSON gönder
+      drawInteraction.on("drawend", (evt) => {
+        const feat = evt.feature;
+        const coord = feat.getGeometry().getCoordinates();
+        waypointFeatures.push(feat);
+        wpLine.appendCoordinate(coord);
 
-    const btnToggle = document.getElementById('wpToggle');
-    const btnUndo   = document.getElementById('wpUndo');
-    let placing = false;
+        const pixel = map.getPixelFromCoordinate(coord);
+        showAltitudeCard(pixel, (altitude) => {
+          const [lon, lat] = ol.proj.toLonLat(coord);
+          window.pushWaypointJSON(
+            JSON.stringify({
+              latitude: lat,
+              longitude: lon,
+              altitude: altitude,
+            })
+          );
+        });
+      });
 
-    btnToggle.addEventListener('click', () => {
-      placing = !placing;
-      btnToggle.classList.toggle('active', placing);
-      if (placing) {
-        dragPan.setActive(false);
-        map.addInteraction(drawInteraction);
-      } else {
-        map.removeInteraction(drawInteraction);
-        dragPan.setActive(true);
-      }
-    });
+      // Mevcut waypoint’a tıklayınca da altitude kartı aç
+      map.on("singleclick", (evt) => {
+        const feature = map.forEachFeatureAtPixel(evt.pixel, (f) => f);
+        if (feature && waypointFeatures.includes(feature)) {
+          const coord = feature.getGeometry().getCoordinates();
+          showAltitudeCard(evt.pixel, (altitude) => {
+            const [lon, lat] = ol.proj.toLonLat(coord);
+            window.pushWaypointJSON(
+              JSON.stringify({
+                latitude: lat,
+                longitude: lon,
+                altitude: altitude,
+              })
+            );
+          });
+        }
+      });
 
-    btnUndo.addEventListener('click', () => {
-      if (!waypointFeatures.length) return;
-      const feat = waypointFeatures.pop();
-      waypointLayer.getSource().removeFeature(feat);
+      // find the DragPan interaction for toggle
+      const dragPan = map
+        .getInteractions()
+        .getArray()
+        .find((i) => i instanceof ol.interaction.DragPan);
 
-      const coords = wpLine.getCoordinates();
-      coords.pop();
-      wpLine.setCoordinates(coords);
+      const btnToggle = document.getElementById("wpToggle");
+      const btnUndo = document.getElementById("wpUndo");
 
-      if (bridgeReady) {
-        window.pushWaypointRemoveJSON();
-      }
-    });
+      btnToggle.addEventListener("click", () => {
+        placing = !placing;
+        btnToggle.classList.toggle("active", placing);
+        if (placing) {
+          dragPan.setActive(false);
+          map.addInteraction(drawInteraction);
+        } else {
+          map.removeInteraction(drawInteraction);
+          dragPan.setActive(true);
+        }
+      });
 
-    // ----------------------------------------
+      btnUndo.addEventListener("click", () => {
+        if (!waypointFeatures.length) return;
+        const feat = waypointFeatures.pop();
+        waypointLayer.getSource().removeFeature(feat);
+        const coords = wpLine.getCoordinates();
+        coords.pop();
+        wpLine.setCoordinates(coords);
+        if (bridgeReady) {
+          window.pushWaypointRemoveJSON();
+        }
+      });
 
-  </script>
-</body>
+      // ----------------------------------------
+    </script>
+  </body>
 </html>
