@@ -6,7 +6,7 @@
 
   <!-- OpenLayers CSS -->
   <link rel="stylesheet"
-        href="https://cdn.jsdelivr.net/npm/ol@latest/ol.css" />
+        href="https://cdn.jsdelivr.net/npm/openlayers@4.6.5/dist/ol.min.css" />
   <style>
     html, body { margin: 0; height: 100% }
     #map       { width: 100%; height: 100%; position: relative;}
@@ -20,6 +20,7 @@
     }
     .toggle-WP button {
       background: white;
+      color: #007ACC;
       border: 1px solid #ccc;
       padding: 5px 15px;
       display: inline-flex;         /* Flex konteyner yapar */
@@ -31,6 +32,11 @@
       margin-left: 1px;
       min-height: 36px;
       cursor: pointer;
+    }
+    /* Hover durumunda arka plan mavi + metin beyaz */
+    .toggle-WP button:hover {
+      background: #ffffff;
+      color: #fff;          /* ⇦ eklendi */
     }
     .toggle-WP button.active {
       background: #007ACC;
@@ -49,9 +55,9 @@
   <div id="map"></div>
 
   <!-- QWebChannel JS (must come before any script that uses `qt.webChannelTransport`) -->
-  <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+  <script src="qwebchannel.js"></script>
   <!-- OpenLayers -->
-  <script src="https://cdn.jsdelivr.net/npm/ol@latest/dist/ol.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/openlayers@4.6.5/dist/ol.min.js"></script>
   <!-- Dynamic Zoom Controller -->
   <script src="./dynamicZoomController.js"></script>
 
